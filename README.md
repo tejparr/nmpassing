@@ -43,7 +43,7 @@ Some info about how it works and how to use can be found here
 
 https://gitter.im/home/learn
 
-##General structure of the repository
+## General structure of the repository
 
 I have added few folders for now to structure the rep. The word file that you sent me is 
 in docs folder. I will also add some matlab code to the code folder. The notes folder 
