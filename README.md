@@ -19,7 +19,9 @@ They also have some tutorials for how to use the app to contribute to projects
 https://help.github.com/desktop/guides/contributing-to-projects/
 
 
-Here are some hopefully useful link if you want to understand more about the git version control (this is more general info and not sepcific to github)
+Here are some hopefully useful link if you want to understand more about the git version control (this is more general info and not specific to github)
+
+http://www.thewindowsclub.com/github-tutorial
 
 https://www.sbf5.com/~cduan/technical/git/
 
@@ -51,21 +53,5 @@ plain text formating syntax. For example this Readme.md file is written in markd
 basic syntax info can be found here 
 
 https://envato.com/blog/beginners-guide-markdown/
-
-Also, what is really nice is that one can write also math directly in markdown using latex 
-syntax. For example
-
-$$ \sum_{i = 1}^\infty p_i = 1 $$
-
-This might be usefull or not but I just put it here as a possibility. One can read more about 
-it here 
-
-https://csrgxtu.github.io/2015/03/20/Writing-Mathematic-Fomulars-in-Markdown/
-
-Also, here is general info about latex, to understand where this commands come from 
-
-https://en.wikibooks.org/wiki/LaTeX/Mathematics
-
-  
 
 
