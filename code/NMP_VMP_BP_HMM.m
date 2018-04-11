@@ -14,26 +14,26 @@ rng default
 %==========================================================================
 % Likelihood matrix
 %--------------------------------------------------------------------------
-A{1}(:,:,1) = eye(3);
-A{1}(:,:,2) = eye(3);
-A{1}(:,:,3) = eye(3);
+A{1}(:,:,1) = 0.85*eye(3)+0.05*ones(3);
+A{1}(:,:,2) = 0.85*eye(3)+0.05*ones(3);
+A{1}(:,:,3) = 0.85*eye(3)+0.05*ones(3);
 
-A{2}(:,:,1) = [1 0 0;
-               0 1 1];
-A{2}(:,:,2) = [1 0 0;
-               0 1 1];
-A{2}(:,:,3) = [1 0 0;
-               0 1 1];
+% A{2}(:,:,1) = [1 0 0;
+%                0 1 1];
+% A{2}(:,:,2) = [1 0 0;
+%                0 1 1];
+% A{2}(:,:,3) = [1 0 0;
+%                0 1 1];
            
 % Transition probabilities
 %--------------------------------------------------------------------------
-B{1} = [0.3 1  0.5;
-        0   0  0.5;
-        0.7 0  0 ];
+B{1} = [0.3 0.3  0.5;
+        0   0.3  0.5;
+        0.7 0.4  0 ];
     
-B{2} = [0.3 1  0.5;
-        0   0  0.5;
-        0.7 0  0 ];
+B{2} = [0.5 0.3  1;
+        0   0.7  0;
+        0.5 0    0];
 
 
 % Prior probabilities
@@ -68,6 +68,11 @@ nmp_plot_updates(HMM)
 figure('Name','Belief dynamics','Color','w','Position',[60 50 1200 590])
 nmp_plot_dynamics(HMM)
 
+figure('Name','Free energy','Color','w','Position',[400 50 600 590])
+plot(HMM.VMP.F),hold on
+plot(HMM.BP.F)
+legend('VMP Marginals','BP Marginals')
+title('Variational free energy')
 
 function HMM = NMP_HMM_GP(hmm)
 % This function takes a hidden Markov model and uses it to generate data
@@ -163,6 +168,7 @@ for t = 1:T
                     lnBs = nmp_ln(B{f})'*Qs{f}(:,tt+1);
                 end
                 v = v + (lnD + lnBs + lnAo(:,tt) - v)/tau;
+                Ft(tt,i,t,f) = Qs{f}(:,tt)'*(lnD + lnAo(:,tt) - log(Qs{f}(:,tt)));
                 Qs{f}(:,tt) = exp(v)/sum(exp(v));
                 Xq{f}(:,tt,t,i) = Qs{f}(:,tt);
                 clear v
@@ -170,10 +176,13 @@ for t = 1:T
         end
     end
 end
+F = sum(Ft,4);
+F = squeeze(sum(F,1));
 
 VMP    = hmm;
 VMP.Qs = Qs; % Posteriors at end
 VMP.Xq = Xq; % Posteriors throughout
+VMP.F  = -F(:);% Free energy
 
 function BP = NMP_BP_HMM(hmm)
 % This function takes an HMM, and uses belief propagation to compute
@@ -250,6 +259,7 @@ for t = 1:T
                     lnBs = ones(size(Qs(:,1)));
                 end
                 v = v + (lnD + lnBs + lnAo(:,tt) - v)/tau;
+                Ft(tt,i,t,f) = Qs{f}(:,tt)'*(lnD + lnAo(:,tt) - log(Qs{f}(:,tt)));
                 Qs{f}(:,tt) = exp(v)/sum(exp(v));
                 Xq{f}(:,tt,t,i) = Qs{f}(:,tt);
             end
@@ -257,11 +267,15 @@ for t = 1:T
     end
 end
 
+F = sum(Ft,4);
+F = squeeze(sum(F,1));
+
 BP    = hmm;
 BP.Qs = Qs;
 BP.M.f = Mf;
 BP.M.b = Mb;
 BP.Xq  = Xq;
+BP.F   = -F(:);
 
 function y = nmp_ln(x)
 % For numerical reasons
@@ -321,10 +335,10 @@ for t = 1:HMM.T
     for i = 1:size(Xv{1},4)
         for f = 1:Nf
             subplot(3,Nf,f)
-            imagesc(1-Xv{f}(:,:,t,i))
+            imagesc(1-Xv{f}(:,:,t,i)), axis off
             title(['Posterior belief (VMP) factor ' num2str(f)])
             subplot(3,Nf,Nf+f)
-            imagesc(1-Xb{f}(:,:,t,i))
+            imagesc(1-Xb{f}(:,:,t,i)), axis off
             title(['Posterior belief (BP) factor ' num2str(f)])
         end
         colormap gray
