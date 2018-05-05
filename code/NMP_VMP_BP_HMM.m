@@ -14,10 +14,10 @@ rng default
 %==========================================================================
 % Likelihood matrix
 %--------------------------------------------------------------------------
-A{1}(:,:,1) = 0.85*eye(3)+0.05*ones(3);
-A{1}(:,:,2) = 0.85*eye(3)+0.05*ones(3);
-A{1}(:,:,3) = 0.85*eye(3)+0.05*ones(3);
-
+d = 3; % dimensionality of hidden states
+for i=1:d
+    A{1}(:,:,i) = .5*eye(d)+.5*ones(d)/d;
+end
 % A{2}(:,:,1) = [1 0 0;
 %                0 1 1];
 % A{2}(:,:,2) = [1 0 0;
@@ -27,30 +27,72 @@ A{1}(:,:,3) = 0.85*eye(3)+0.05*ones(3);
            
 % Transition probabilities
 %--------------------------------------------------------------------------
-B{1} = [0.3 0.3  0.5;
-        0   0.3  0.5;
-        0.7 0.4  0 ];
-    
-B{2} = [0.5 0.3  1;
-        0   0.7  0;
-        0.5 0    0];
+if d == 3
+    B{1} = [0.3 0.3  0.5;
+            0   0.3  0.5;
+            0.7 0.4  0 ];
+
+    B{2} = [0.5 0.3  1;
+            0   0.7  0;
+            0.5 0    0];
+else
+    B{1} = 0.7*eye(d) + 0.3*(ones(d) -eye(d))/(d-1);
+    B{2} = 0.9*eye(d) + 0.1*(ones(d) -eye(d))/(d-1);
+end
 
 
 % Prior probabilities
 %--------------------------------------------------------------------------
-D{1} = [0 0 1]';
-D{2} = [1 0 0]';
+if d == 3
+    D{1} = [1 0 0]';
+    D{2} = [0 0 1]';
+else
+    D{1} = zeros(d,1)/d;
+    D{1}(1) = 1;
+    D{2} = zeros(d,1);
+    D{2}(end) = 1;
+end
 
 % Set up hmm structure
 %--------------------------------------------------------------------------
-hmm.A = A; % Likelihood
-hmm.B = B; % Transitions
-hmm.D = D; % Priors
+%make true likelihood different from agents likelihood
+diffA = 0;
+diffB = 0;
+diffD = 0;
+if diffA
+    for i=1:d
+        TA{1}(:,:,i) = 0.9*eye(d)+0.1*ones(d)/d;
+    end
+else
+    TA = A;
+end
+
+if diffB
+   TB{1} = eye(d);
+   TB{2} = B{2};
+else
+    TB = B;
+end
+
+if diffD
+    TD = D;
+    TD{1}(1) = 0;
+    TD{1}(3) = 1;
+else
+    TD = D;
+end
+
+hmm.A = TA; % Likelihood
+hmm.B = TB; % Transitions
+hmm.D = TD; % Priors
 hmm.T = 15; % Time
 
 % Invert
 %--------------------------------------------------------------------------
 HMM = NMP_HMM_GP(hmm); % Generate data using HMM generative process
+HMM.B = B;
+HMM.A = A;
+HMM.D = D;
 VMP = NMP_VMP_HMM(HMM);% Invert using variational message passing
 BP  = NMP_BP_HMM(HMM); % Invert using belief propagation
 
@@ -59,20 +101,21 @@ HMM.BP  = BP;
 
 % Figures
 %--------------------------------------------------------------------------
-figure('Name','Posterior beliefs','Color','w')
-nmp_plot_posteriors(HMM)
+% figure('Name','Posterior beliefs','Color','w')
+% nmp_plot_posteriors(HMM)
 
 figure('Name','Belief updating','Color','w','Position',[400 50 600 590])
 nmp_plot_updates(HMM)
 
-figure('Name','Belief dynamics','Color','w','Position',[60 50 1200 590])
-nmp_plot_dynamics(HMM)
+% figure('Name','Belief dynamics','Color','w','Position',[60 50 1200 590])
+% nmp_plot_dynamics(HMM)
 
 figure('Name','Free energy','Color','w','Position',[400 50 600 590])
 plot(HMM.VMP.F),hold on
 plot(HMM.BP.F)
 legend('VMP Marginals','BP Marginals')
 title('Variational free energy')
+end
 
 function HMM = NMP_HMM_GP(hmm)
 % This function takes a hidden Markov model and uses it to generate data
@@ -86,7 +129,6 @@ A = hmm.A;
 B = hmm.B;
 D = hmm.D;
 T = hmm.T;
-
 for f = 1:numel(D)
     s{f}(1) = find(cumsum(D{f})>=rand, 1);
     for t = 2:T
@@ -107,6 +149,7 @@ end
 HMM = hmm;
 HMM.s = s;
 HMM.o = o;
+end
 
 function VMP = NMP_VMP_HMM(hmm)
 % This function takes an HMM, and uses variational message passing to
@@ -183,6 +226,7 @@ VMP    = hmm;
 VMP.Qs = Qs; % Posteriors at end
 VMP.Xq = Xq; % Posteriors throughout
 VMP.F  = -F(:);% Free energy
+end
 
 function BP = NMP_BP_HMM(hmm)
 % This function takes an HMM, and uses belief propagation to compute
@@ -276,10 +320,12 @@ BP.M.f = Mf;
 BP.M.b = Mb;
 BP.Xq  = Xq;
 BP.F   = -F(:);
+end
 
 function y = nmp_ln(x)
 % For numerical reasons
 y = log(x+exp(-16));
+end
 
 function B = nmp_dot(A,s,f)
 % multidimensional dot product along dimension f
@@ -296,152 +342,5 @@ for i = 1:4
     k(find(k==0,1))=i;
 end
 B = permute(B,k);
-
-function nmp_plot_posteriors(HMM)
-Nf  = numel(HMM.B);
-VMP = HMM.VMP;
-BP  = HMM.BP;
-for i = 1:Nf
-    subplot(3,Nf,i)
-    imagesc(1-VMP.Qs{i})
-    title(['Posterior belief (VMP) factor ' num2str(i)])
-    subplot(3,Nf,Nf+i)
-    imagesc(1-BP.Qs{i})
-    title(['Posterior belief (BP) factor ' num2str(i)])
-    subplot(3,Nf,2*Nf+i)
-    plot(HMM.s{i},'.r','MarkerSize',20)
-    axis ij
-    title(['True state - factor ' num2str(i)])
-end
-colormap gray
-
-function nmp_plot_updates(HMM)
-% M = [];
-
-Xv = HMM.VMP.Xq;
-Xb = HMM.BP.Xq;
-
-Nf = numel(Xv);
-
-for t = 1:HMM.T
-    subplot(3,1,3)
-    for g = 1:numel(HMM.o)
-        plot(HMM.o{g}(1:t)+g/numel(HMM.o),'.','MarkerSize', 30), hold on
-        axis([0 HMM.T+1 0 5])
-        axis ij
-        ylabel('Sensory data')
-    end
-    hold off
-    for i = 1:size(Xv{1},4)
-        for f = 1:Nf
-            subplot(3,Nf,f)
-            imagesc(1-Xv{f}(:,:,t,i)), axis off
-            title(['Posterior belief (VMP) factor ' num2str(f)])
-            subplot(3,Nf,Nf+f)
-            imagesc(1-Xb{f}(:,:,t,i)), axis off
-            title(['Posterior belief (BP) factor ' num2str(f)])
-        end
-        colormap gray
-        
-%         if numel(M)
-%             M(end + 1) = getframe(gcf);
-%         else
-%             M = getframe(gcf);
-%         end
-%         im = frame2im(M(end));
-%         [A,map] = rgb2ind(im,256);
-%         if t==1 && i == 1
-%             imwrite(A,map,'C:\Users\Thomas\Dropbox\Code\Neuronal message passing\NMP.gif','gif','LoopCount',Inf,'DelayTime',0.1);
-%         else
-%             imwrite(A,map,'C:\Users\Thomas\Dropbox\Code\Neuronal message passing\NMP.gif','gif','WriteMode','append','DelayTime',0.1);
-%         end
-        pause(0.01)
-    end
 end
 
-function nmp_plot_dynamics(HMM)
-% M = [];
-
-Xv = HMM.VMP.Xq;
-Xb = HMM.BP.Xq;
-
-V = [];
-B = [];
-for f = 1:numel(Xv)
-Vf{f} = [];
-Bf{f} = [];
-        for j = 1:size(Xv{f},3)
-            for k = 1:size(Xv{f},4)
-                v = Xv{f}(:,:,j,k);
-                Vf{f}(end+1,:) = v(:);
-                b = Xb{f}(:,:,j,k);
-                Bf{f}(end+1,:) = b(:);
-                clear v b
-            end
-        end
-V(:,end+1:end+size(Vf{f},2)) = Vf{f};
-B(:,end+1:end+size(Bf{f},2)) = Bf{f};
-end
-PV = pca(V);
-PV1 = V*PV(:,1);
-PV2 = V*PV(:,2);
-PV3 = V*PV(:,3);
-
-PB = pca(B);
-PB1 = V*PB(:,1);
-PB2 = V*PB(:,2);
-PB3 = V*PB(:,3);
-
-for i = 1:length(V)
-    subplot(2,2,1)
-    plot(1:i,V(1:i,:))
-    title('Beliefs (VMP)')
-    axis([0 length(V) 0 1])
-    
-    subplot(2,2,2)
-    plot(1:i,B(1:i,:))
-    title('Beliefs (BP)')
-    axis([0 length(B) 0 1])
-    
-    subplot(2,4,5)
-    plot(PV1(1:i),PV2(1:i))
-    xlabel('PC 1')
-    ylabel('PC 2')
-    axis([min(PV1) max(PV1) min(PV2) max(PV2)]);
-    axis square
-    
-    subplot(2,4,7)
-    plot(PB1(1:i),PB2(1:i))
-    xlabel('PC 1')
-    ylabel('PC 2')
-    axis([min(PB1) max(PB1) min(PB2) max(PB2)]);
-    axis square
-    
-    subplot(2,4,6)
-    plot(PV2(1:i),PV3(1:i))
-    xlabel('PC 2')
-    ylabel('PC 3')
-    axis([min(PV2) max(PV2) min(PV3) max(PV3)]);
-    axis square
-    
-    subplot(2,4,8)
-    plot(PB2(1:i),PB3(1:i))
-    xlabel('PC 2')
-    ylabel('PC 3')
-    axis([min(PB2) max(PB2) min(PB3) max(PB3)]);
-    axis square
-    drawnow
-    
-%     if numel(M)
-%         M(end + 1) = getframe(gcf);
-%     else
-%         M = getframe(gcf);
-%     end
-%     im = frame2im(M(end));
-%     [A,map] = rgb2ind(im,256);
-%     if i==1
-%         imwrite(A,map,'C:\Users\Thomas\Dropbox\Code\Neuronal message passing\Dynamics.gif','gif','LoopCount',Inf,'DelayTime',0.1);
-%     else
-%         imwrite(A,map,'C:\Users\Thomas\Dropbox\Code\Neuronal message passing\Dynamics.gif','gif','WriteMode','append','DelayTime',0.1);
-%     end
-end
