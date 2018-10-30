@@ -19,6 +19,10 @@ rng default
 A{1}(:,:,1) = 0.85*eye(3)+0.05*ones(3);
 A{1}(:,:,2) = 0.85*eye(3)+0.05*ones(3);
 A{1}(:,:,3) = 0.85*eye(3)+0.05*ones(3);
+% A{1}(:,:,1) = eye(3);
+% A{1}(:,:,2) = eye(3);
+% A{1}(:,:,3) = eye(3);
+
 
 % Transition probabilities
 %--------------------------------------------------------------------------
@@ -29,6 +33,13 @@ B{1} = [0.3 0.3  0.5;
 B{2} = [0.5 0.3  1;
         0   0.7  0;
         0.5 0    0];
+% B{1} = [0 0  1;
+%         0 0  1;
+%         1 1  0];
+%     
+% B{2} = [0 0  1;
+%         0 0  1;
+%         1 1  0];
 
 % Prior probabilities
 %--------------------------------------------------------------------------
@@ -246,10 +257,10 @@ for t = 1:T
                 if tt == 1
                     lnD = nmp_ln(D{f});
                 else
-                lnD  = nmp_ln(B{f}*Mf{f}(:,tt-1));
+                    lnD  = nmp_ln(B{f}*(Mf{f}(:,tt-1).*exp(lnAo(:,tt-1))));
                 end
                 if tt<T
-                lnBs = nmp_ln(B{f}'*Mb{f}(:,tt+1));
+                    lnBs = nmp_ln(B{f}'*(Mb{f}(:,tt+1).*exp(lnAo(:,tt+1))));
                 else
                     lnBs = ones(size(Qs(:,1)));
                 end
@@ -348,6 +359,7 @@ MMP.Qs = Qs; % Posteriors at end
 MMP.Xq = Xq; % Posteriors throughout
 MMP.F  = -F(:);% Free energy
 
+
 function y = nmp_ln(x)
 % For numerical reasons
 y = log(x+exp(-16));
@@ -359,7 +371,8 @@ d(f) = 1;
 for i = 2:5
     d(find(d==0,1))=i;
 end
-x = permute(s,d) + zeros(size(A));
+x = permute(s,d);
+x = repmat(x,size(A)-size(x)+1);
 B = sum(A.*x,f);
 k = zeros(1,5);
 k(f) = 5;
@@ -516,3 +529,19 @@ for i = 1:size(B,1)
 end
 bbb(bbb == 0) = 1/size(bbb,1);
 b = B./bbb;
+
+
+% KL-Divergences between BP and VMP/MMP
+%
+% HMM = ans;
+% BP = HMM.BP.Qs;
+% VMP = HMM.VMP.Qs;
+% MMP = HMM.MMP.Qs;
+% for i = 1:2
+%     for j = 1:15
+%         KL_BP_VMP(i,j) = BP{i}(:,j)'*(log(BP{i}(:,j))-log(VMP{i}(:,j)));
+%         KL_BP_MMP(i,j) = BP{i}(:,j)'*(log(BP{i}(:,j))-log(MMP{i}(:,j)));
+%     end
+% end
+% sum(sum(KL_BP_VMP))
+% sum(sum(KL_BP_MMP))
